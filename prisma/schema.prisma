@@ -1,0 +1,143 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+// ---------- DO NOT EDIT ABOVE THIS LINE ----------
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id                Int                 @id @default(autoincrement())
+  name              String
+  shopDomain        String              @unique
+  accessToken       String
+  users             User[]
+  customers         Customer[]
+  products          Product[]
+  orders            Order[]
+  orderItems        OrderItem[] 
+  CheckoutEvent     CheckoutEvent[]
+  CartEvent         CartEvent[]
+  AbandonedCheckout AbandonedCheckout[]
+
+  @@index([shopDomain])
+}
+
+model User {
+  id       Int    @id @default(autoincrement())
+  tenantId Int
+  email    String @unique
+  password String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+}
+
+model Customer {
+  id        Int     @id @default(autoincrement())
+  tenantId  Int
+  shopifyId String
+  name      String
+  email     String?
+  tenant    Tenant  @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, shopifyId]) 
+  @@index([tenantId])
+}
+
+model Product {
+  id        Int     @id @default(autoincrement())
+  tenantId  Int
+  shopifyId String
+  title     String
+  price     Decimal @db.Decimal(10, 2)
+  tenant    Tenant  @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, shopifyId]) 
+  @@index([tenantId])
+}
+
+model Order {
+  id         Int         @id @default(autoincrement())
+  tenantId   Int
+  shopifyId  String
+  customerId Int?
+  total      Decimal     @db.Decimal(10, 2)
+  orderDate  DateTime
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  items      OrderItem[] 
+
+  @@map("Order")
+  @@unique([tenantId, shopifyId]) 
+  @@index([tenantId, orderDate])
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  tenantId  Int
+  orderId   Int
+  shopifyId String 
+  title     String
+  quantity  Int
+  lineTotal Decimal @db.Decimal(10, 2)
+
+  order  Order  @relation(fields: [orderId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, shopifyId]) 
+  @@index([tenantId, orderId])
+}
+
+model CheckoutEvent {
+  id         Int      @id @default(autoincrement())
+  tenantId   Int
+  shopDomain String
+  checkoutId String 
+  email      String?
+  status     String 
+  subtotal   Decimal  @db.Decimal(10, 2)
+  occurredAt DateTime @default(now())
+  raw        Json
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, checkoutId, status]) 
+  @@index([tenantId, occurredAt])
+}
+
+model CartEvent {
+  id         Int      @id @default(autoincrement())
+  tenantId   Int
+  shopDomain String
+  cartToken  String
+  event      String 
+  occurredAt DateTime @default(now())
+  raw        Json
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, cartToken, event]) 
+  @@index([tenantId, occurredAt])
+}
+
+model AbandonedCheckout {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int
+  shopifyId String
+  email     String?
+  name      String?
+  total     Float?
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, shopifyId])
+}
